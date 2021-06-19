@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31410.223
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BangumiData", "BangumiData\BangumiData.csproj", "{440BA6D0-FAD2-42DF-8B89-885D120016EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiTest", "ApiTest\ApiTest.csproj", "{CCA8944B-FAEC-4849-B502-1EBCEB15A655}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{440BA6D0-FAD2-42DF-8B89-885D120016EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{440BA6D0-FAD2-42DF-8B89-885D120016EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{440BA6D0-FAD2-42DF-8B89-885D120016EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{440BA6D0-FAD2-42DF-8B89-885D120016EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCA8944B-FAEC-4849-B502-1EBCEB15A655}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCA8944B-FAEC-4849-B502-1EBCEB15A655}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCA8944B-FAEC-4849-B502-1EBCEB15A655}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCA8944B-FAEC-4849-B502-1EBCEB15A655}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {781DD4BA-6380-46EA-8A5A-A83EFD0470EE}
+	EndGlobalSection
+EndGlobal
