@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace BangumiData
+namespace BangumiData.Models
 {
     public class RootObject
     {
@@ -99,7 +99,7 @@ namespace BangumiData
         /// 月播："R/2020-01-01T13:00:00Z/P1M"
         /// </summary>
         [JsonPropertyName("broadcast")]
-        public string? Broadcast { get; set; }
+        public Broadcast? Broadcast { get; set; }
 
         /// <summary>
         /// Examples: "1960-01-15T16:30:00Z", "1969-03-30T16:30:00Z", "1971-09-18T16:30:00Z", "1968-07-21T17:00:00Z", "1969-03-25T13:45:00Z"
@@ -156,7 +156,7 @@ namespace BangumiData
         /// 月播："R/2020-01-01T13:00:00Z/P1M"
         /// </summary>
         [JsonPropertyName("broadcast")]
-        public string? Broadcast { get; set; }
+        public Broadcast? Broadcast { get; set; }
 
         /// <summary>
         /// Examples: "", "港区可见", "分割为 TV 放送", "原始版本为剧场版但是 Netflix 目前将其做成 14 集 TV 分割形式放送"

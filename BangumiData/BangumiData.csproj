@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <UserSecretsId>090680b4-0f08-4ab2-bab8-e78a5c07b36b</UserSecretsId>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>

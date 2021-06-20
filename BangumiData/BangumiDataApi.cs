@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using BangumiData.JsonConverters;
 using System.Text.Json;
+using BangumiData.Models;
 
 namespace BangumiData
 {
