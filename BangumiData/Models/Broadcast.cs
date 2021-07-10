@@ -2,7 +2,7 @@
 
 namespace BangumiData.Models
 {
-    public struct Broadcast
+    public class Broadcast
     {
         public Broadcast(DateTimeOffset begin, int interval, IntervalUnit intervalUnit)
         {
@@ -11,7 +11,6 @@ namespace BangumiData.Models
             Unit = intervalUnit;
         }
 
-        public static Broadcast Empty = new(DateTimeOffset.MinValue, 0, IntervalUnit.Day);
         public DateTimeOffset Begin { get; }
         public int Interval { get; }
         public IntervalUnit Unit { get; }
@@ -25,9 +24,9 @@ namespace BangumiData.Models
         /// </param>
         /// <param name="result"></param>
         /// <returns></returns>
-        public static bool TryParse(string? input, out Broadcast result)
+        public static bool TryParse(string? input, out Broadcast? result)
         {
-            result = Empty;
+            result = null;
             if (string.IsNullOrWhiteSpace(input))
             {
                 return false;
@@ -42,12 +41,16 @@ namespace BangumiData.Models
                 return false;
             }
             // 周期数
-            if (!int.TryParse(ins[2][1..^1], out int interval))
+            // .NET Standard 2.1
+            //if (!int.TryParse(ins[2][1..^1], out int interval))
+            if (!int.TryParse(ins[2].Substring(1, ins[2].Length - 2), out int interval))
             {
                 return false;
             }
             // 周期单位
-            var intervalUnit = (IntervalUnit)ins[2][^1];
+            // .NET Standard 2.1
+            //var intervalUnit = (IntervalUnit)ins[2][^1];
+            var intervalUnit = (IntervalUnit)ins[2][ins[2].Length - 1];
             if (!Enum.IsDefined(typeof(IntervalUnit), intervalUnit))
             {
                 return false;
@@ -78,9 +81,19 @@ namespace BangumiData.Models
             };
         }
 
+        public DateTimeOffset Round(DateTimeOffset dateTimeOffset)
+        {
+            return Unit switch
+            {
+                IntervalUnit.Day => Begin.AddDays(Interval * (int)Math.Round((dateTimeOffset - Begin.Date).Days / (double)Interval, MidpointRounding.AwayFromZero)),
+                IntervalUnit.Month => Begin.AddYears(dateTimeOffset.Year - Begin.Year).AddMonths(dateTimeOffset.Month - Begin.Month),
+                _ => throw new InvalidOperationException("No IntervalUnit specified.")
+            };
+        }
+
         public override string? ToString()
         {
-            return $"R/{Begin:yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'}/P{Interval}{Unit}";
+            return $"R/{Begin.ToString(RootObject.DateTimeFormat)}/P{Interval}{(char)Unit}";
         }
     }
 

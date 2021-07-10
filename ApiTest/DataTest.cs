@@ -3,8 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using BangumiData;
-using BangumiData.JsonConverters;
 using BangumiData.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -20,10 +20,7 @@ namespace ApiTest
         public void ReadData()
         {
             Debug.WriteLine(GC.GetTotalMemory(true));
-            JsonSerializerOptions options = new JsonSerializerOptions();
-            options.Converters.Add(new CustomDateTimeOffsetConverter());
-            options.Converters.Add(new BroadcastConverter());
-            _rootObject = JsonSerializer.Deserialize<RootObject>(File.ReadAllBytes(@".\TestData\data.json"), options);
+            _rootObject = JsonSerializer.Deserialize<RootObject>(File.ReadAllBytes(@".\TestData\data.json"), RootObject.GetJsonSerializerOptions());
             Debug.WriteLine(GC.GetTotalMemory(true));
         }
 
@@ -33,21 +30,25 @@ namespace ApiTest
             Broadcast val;
 
             Assert.IsFalse(Broadcast.TryParse("", out val));
-            Assert.AreEqual(Broadcast.Empty, val);
+            Assert.IsNull(val);
             Assert.IsFalse(Broadcast.TryParse("R/2020-01-01T13:00:00Z/P1W", out val));
-            Assert.AreEqual(Broadcast.Empty, val);
+            Assert.IsNull(val);
 
             Assert.IsTrue(Broadcast.TryParse("R/2020-01-01T13:00:00Z/P7D", out val));
-            Assert.AreNotEqual(Broadcast.Empty, val);
+            Assert.IsNotNull(val);
+            Assert.AreEqual("R/2020-01-01T13:00:00Z/P7D", val.ToString());
             Assert.AreEqual(DateTimeOffset.Parse("2020-01-01T13:00:00Z"), val.Next(0));
             Assert.AreEqual(DateTimeOffset.Parse("2020-01-01T13:00:00Z").AddDays(7), val.Next(1));
 
             Assert.IsTrue(Broadcast.TryParse("R/2020-01-01T13:00:00Z/P14D", out val));
-            Assert.AreNotEqual(Broadcast.Empty, val);
+            Assert.IsNotNull(val);
+            Assert.AreEqual("R/2020-01-01T13:00:00Z/P14D", val.ToString());
             Assert.IsTrue(Broadcast.TryParse("R/2020-01-01T13:00:00Z/P0D", out val));
-            Assert.AreNotEqual(Broadcast.Empty, val);
+            Assert.IsNotNull(val);
+            Assert.AreEqual("R/2020-01-01T13:00:00Z/P0D", val.ToString());
             Assert.IsTrue(Broadcast.TryParse("R/2020-01-01T13:00:00Z/P1M", out val));
-            Assert.AreNotEqual(Broadcast.Empty, val);
+            Assert.IsNotNull(val);
+            Assert.AreEqual("R/2020-01-01T13:00:00Z/P1M", val.ToString());
         }
 
         [TestMethod]
@@ -101,18 +102,51 @@ namespace ApiTest
         }
 
         [TestMethod]
-        public void TestBangumiDataApi()
+        public async Task TestBangumiDataApi()
         {
             _api = new BangumiDataApi(@".\TestData");
             ReadData();
+            Assert.IsNull(_api.HasUpdate());
+            _api.GetEnabledSites();
+            _api.GetDisabledSites();
             foreach (var item in _rootObject.Items)
             {
                 var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
                 if (x != null)
                 {
-                    _api.GetItemById(x.Id);
+                    //_api.GetAirTimeByBangumiId(x.Id);
+                    await _api.GetAirSitesByBangumiId(x.Id);
                 }
             }
+            _api.UseBiliApp = true;
+            foreach (var item in _rootObject.Items)
+            {
+                var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
+                if (x != null)
+                {
+                    //_api.GetAirTimeByBangumiId(x.Id);
+                    await _api.GetAirSitesByBangumiId(x.Id);
+                }
+            }
+        }
+
+        [TestMethod]
+        public async Task TestBiliSeasonIdMapper()
+        {
+            var map = new BiliSeasonIdMapper(@".\TestData\map.json");
+            var id = await map.GetSeasonIdAsync("28233896");
+            Assert.AreEqual("38214", id);
+        }
+
+        [TestMethod]
+        public async Task TestBangumiDataApiUpdate()
+        {
+            _api = new BangumiDataApi(@".\TestData");
+            Assert.IsTrue(string.IsNullOrEmpty(_api.LatestVersion));
+            Assert.IsNull(_api.HasUpdate());
+            Assert.IsFalse(string.IsNullOrEmpty(await _api.GetLatestVersion()));
+            Assert.AreEqual(_api.LatestVersion != _api.Version, _api.HasUpdate());
+            await _api.DownloadLatestBangumiData();
         }
     }
 }

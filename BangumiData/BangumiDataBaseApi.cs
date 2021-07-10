@@ -1,30 +1,33 @@
-﻿using System;
-using System.Diagnostics;
-using System.Linq;
+﻿using System.Linq;
 using BangumiData.Models;
 
 namespace BangumiData
 {
     public class BangumiDataBaseApi
     {
-        private RootObject _rootObject;
+        public RootObject Root { get; private set; }
 
         protected BangumiDataBaseApi() { }
 
-        protected void Init(RootObject rootObject)
+        protected void Init(RootObject root)
         {
-            _rootObject = rootObject;
+            Root = root;
         }
 
-        public BangumiDataBaseApi(RootObject rootObject)
+        public BangumiDataBaseApi(RootObject root)
         {
-            _rootObject = rootObject;
+            Root = root;
         }
 
+        /// <summary>
+        /// 根据站点名与id获取番剧条目
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="siteName"></param>
+        /// <returns></returns>
         public Item? GetItemById(string id, string siteName = "bangumi")
         {
-            return _rootObject.Items.FirstOrDefault(e => e.Sites.Any(s => s.SiteName == siteName && s.Id == id));
+            return Root.Items.FirstOrDefault(e => e.Sites.Any(s => s.SiteName == siteName && s.Id == id));
         }
-
     }
 }

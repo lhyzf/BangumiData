@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BangumiData.Models;
 
 namespace BangumiData.JsonConverters
 {
@@ -15,7 +16,7 @@ namespace BangumiData.JsonConverters
 
         public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value?.ToString());
+            writer.WriteStringValue(value?.ToString(RootObject.DateTimeFormat));
         }
     }
 }

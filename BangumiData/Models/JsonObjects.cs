@@ -2,12 +2,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 
 namespace BangumiData.Models
 {
     public class RootObject
     {
+        public const string DateTimeFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'";
 
         /// <summary>
         /// Examples: {"bangumi":{"title":"番组计划","urlTemplate":"http://bangumi.tv/subject/{{id}}","type":"info"},"saraba1st":{"title":"Stage1st","urlTemplate":"https://bbs.saraba1st.com/2b/thread-{{id}}-1-1.html","type":"info"},"acfun":{"title":"AcFun","urlTemplate":"http://www.acfun.cn/v/ab{{id}}","type":"onair"},"bilibili":{"title":"哔哩哔哩","urlTemplate":"https://bangumi.bilibili.com/anime/{{id}}","type":"onair"},"tucao":{"title":"TUCAO","urlTemplate":"http://www.tucao.tv/index.php?m=search&c=index&a=init2&q={{id}}","type":"onair"},"sohu":{"title":"搜狐视频","urlTemplate":"https://tv.sohu.com/{{id}}","type":"onair"},"youku":{"title":"优酷","urlTemplate":"https://list.youku.com/show/id_z{{id}}.html","type":"onair"},"tudou":{"title":"土豆","urlTemplate":"https://www.tudou.com/albumcover/{{id}}.html","type":"onair"},"qq":{"title":"腾讯视频","urlTemplate":"https://v.qq.com/detail/{{id}}.html","type":"onair"},"iqiyi":{"title":"爱奇艺","urlTemplate":"https://www.iqiyi.com/{{id}}.html","type":"onair"},"letv":{"title":"乐视","urlTemplate":"https://www.le.com/comic/{{id}}.html","type":"onair"},"pptv":{"title":"PPTV","urlTemplate":"http://v.pptv.com/page/{{id}}.html","type":"onair"},"kankan":{"title":"响巢看看","urlTemplate":"http://movie.kankan.com/movie/{{id}}","type":"onair"},"mgtv":{"title":"芒果tv","urlTemplate":"https://www.mgtv.com/h/{{id}}.html","type":"onair"},"nicovideo":{"title":"Niconico","urlTemplate":"https://ch.nicovideo.jp/{{id}}","type":"onair"},"netflix":{"title":"Netflix","urlTemplate":"https://www.netflix.com/title/{{id}}","type":"onair"},"dmhy":{"title":"动漫花园","urlTemplate":"https://share.dmhy.org/topics/list?keyword={{id}}","type":"resource"},"nyaa":{"title":"nyaa","urlTemplate":"https://www.nyaa.se/?page=search&term={{id}}","type":"resource"}}
@@ -20,6 +24,18 @@ namespace BangumiData.Models
         /// </summary>
         [JsonPropertyName("items")]
         public Item[] Items { get; set; }
+
+        public static JsonSerializerOptions GetJsonSerializerOptions()
+        {
+            JsonSerializerOptions options = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Encoder = JavaScriptEncoder.Create(UnicodeRanges.All)
+            };
+            options.Converters.Add(new JsonConverters.CustomDateTimeOffsetConverter());
+            options.Converters.Add(new JsonConverters.BroadcastConverter());
+            return options;
+        }
     }
 
     public class SiteMeta
