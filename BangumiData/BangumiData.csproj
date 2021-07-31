@@ -5,6 +5,15 @@
     <UserSecretsId>090680b4-0f08-4ab2-bab8-e78a5c07b36b</UserSecretsId>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <PackageId>Z19.BangumiData</PackageId>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Authors>猫苇</Authors>
+    <Version>0.1.0-beta</Version>
+    <Copyright>Copyright (c) 2021 猫苇</Copyright>
+    <Description>A bangumi-data wrapper.</Description>
+    <RepositoryUrl>https://github.com/lhyzf/BangumiData</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>

@@ -21,7 +21,7 @@ namespace BangumiData
                 };
                 _client = new HttpClient(handler);
                 // 添加登录后默认的 Headers
-                _client.DefaultRequestHeaders.Add("User-Agent", "BangumiDataApi");
+                _client.DefaultRequestHeaders.Add("User-Agent", "Z19.BangumiData");
             }
         }
 

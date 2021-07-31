@@ -154,8 +154,9 @@ namespace ApiTest
         {
             _api = new BangumiDataApi(@".\TestData");
             var ret = await _api.TryGetLatestVersion();
-            _api.AutoCheck = true;
             Assert.IsTrue(ret.IsSuccess);
+            _api.AutoCheck = true;
+            _api.CheckInterval = 0;
             AutoResetEvent autoEvent = new AutoResetEvent(false);
             _api = new BangumiDataApi(@".\TestData",
                 new EventHandler((s, e) =>
@@ -171,8 +172,10 @@ namespace ApiTest
         {
             _api = new BangumiDataApi(@".\TestData");
             var ret = await _api.TryGetLatestVersion();
+            Assert.IsTrue(ret.IsSuccess);
             _api.AutoCheck = true;
             _api.AutoUpdate = true;
+            _api.CheckInterval = 0;
             bool flag = false;
             AutoResetEvent autoEvent = new AutoResetEvent(false);
             _api = new BangumiDataApi(@".\TestData",
