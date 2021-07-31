@@ -18,9 +18,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="TestData\config.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="TestData\data.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="TestData\map.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <ProjectExtensions><VisualStudio><UserProperties testdata_4config_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>
 
 </Project>

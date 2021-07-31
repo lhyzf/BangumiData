@@ -28,18 +28,27 @@ namespace BangumiData
         public DateTimeOffset? LastUpdate => _vInfo.LastUpdate;
 
 
-
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="directory">Require read/write folder path to save bangumi-data cache file.</param>
-        public BangumiDataApi(string directory)
+        private BangumiDataApi(string directory)
         {
             SetDirectory(directory);
-            LoadConfig().Wait();
-            LoadData().Wait();
         }
 
+        public BangumiDataApi(string directory,
+            EventHandler newVersionFoundedEventHandler = null,
+            EventHandler downloadStartedEventHandler = null,
+            EventHandler versionUpdatedEventHandler = null) : this(directory)
+        {
+            LoadConfig().Wait();
+            LoadData().Wait();
+            NewVersionFounded += newVersionFoundedEventHandler;
+            DownloadStarted += downloadStartedEventHandler;
+            VersionUpdated += versionUpdatedEventHandler;
+            _ = CheckUpdate();
+        }
 
 
         /// <summary>
@@ -177,7 +186,7 @@ namespace BangumiData
                         _vInfo.AutoUpdate = false;
                         _vInfo.CheckInterval = 7;
                     }
-                    _ = SaveConfig();
+                    SaveConfig().Wait();
                 }
             }
         }
@@ -190,7 +199,7 @@ namespace BangumiData
                 if (_vInfo.AutoUpdate != value)
                 {
                     _vInfo.AutoUpdate = value;
-                    _ = SaveConfig();
+                    SaveConfig().Wait();
                 }
             }
         }
@@ -203,71 +212,71 @@ namespace BangumiData
                 if (_vInfo.CheckInterval != value)
                 {
                     _vInfo.CheckInterval = value;
-                    _ = SaveConfig();
+                    SaveConfig().Wait();
                 }
             }
         }
 
-        public string? LatestVersion { get; private set; } = string.Empty;
-
         public event EventHandler NewVersionFounded;
-        public event EventHandler NewVersionUpdated;
         public event EventHandler DownloadStarted;
-        public event EventHandler DownloadCompleted;
+        public event EventHandler VersionUpdated;
 
         /// <summary>
-        /// bangumi-data 是否有更新
-        /// <br/>若未检查过更新或检查更新失败，返回 null；若最新版本
-        /// </summary>
-        /// <returns></returns>
-        public bool? HasUpdate()
-        {
-            if (string.IsNullOrEmpty(LatestVersion))
-            {
-                return null;
-            }
-            return LatestVersion != _vInfo.Version;
-        }
-
-        /// <summary>
-        /// 获取最新版本号，并暂存
+        /// 尝试获取最新版本号
         /// </summary>
         /// <returns>返回最新版本号，失败后返回空字符串</returns>
-        public async Task<string?> GetLatestVersion()
+        public async Task<(bool IsSuccess, string Version)> TryGetLatestVersion()
         {
             try
             {
                 var result = await HttpHelper.GetJsonDocumentAsync(BangumiDataUrl).ConfigureAwait(false);
-                LatestVersion = result?.RootElement[0].GetProperty("name").GetString();
-                return LatestVersion;
+                var version = result.RootElement[0].GetProperty("name").GetString();
+                if (string.IsNullOrEmpty(version))
+                {
+                    return (false, string.Empty);
+                }
+                return (true, version);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex);
-                return string.Empty;
+                return (false, string.Empty);
             }
         }
 
         /// <summary>
         /// 获取最新版本并下载数据
         /// </summary>
-        /// <param name="startDownloadCallback">获取到最新版本后回调</param>
-        /// <returns></returns>
-        public async Task<bool> DownloadLatestBangumiData()
+        /// <param name="newVersion">若已获取版本号，可提供参数以跳过该方法的版本号检查</param>
+        /// <returns>当前已是最新版本或更新版本成功时返回 true</returns>
+        public async Task<bool> DownloadLatestVersion(string newVersion = "")
         {
-            // 获取最新版本
-            if (HasUpdate() != true && string.IsNullOrEmpty(await GetLatestVersion().ConfigureAwait(false)))
+            // 未提供版本参数，在此处获取版本
+            if (string.IsNullOrEmpty(newVersion))
             {
-                return false;
+                var latestVersion = await TryGetLatestVersion().ConfigureAwait(false);
+                // 获取最新版本失败
+                if (!latestVersion.IsSuccess)
+                {
+                    return false;
+                }
+                // 已是最新版本
+                if (Version == latestVersion.Version)
+                {
+                    _vInfo.LastUpdate = DateTimeOffset.UtcNow;
+                    await SaveConfig().ConfigureAwait(false);
+                    return true;
+                }
+                newVersion = latestVersion.Version;
             }
-            // 已是最新版本
-            if (_vInfo.Version == LatestVersion)
+            else
             {
-                _vInfo.LastUpdate = DateTimeOffset.UtcNow;
-                await SaveConfig().ConfigureAwait(false);
-                return true;
+                if (newVersion == _vInfo.Version)
+                {
+                    return true;
+                }
             }
-            DownloadStarted?.Invoke(this, new EventArgs());
+            RaiseDownloadStartedEvent();
             try
             {
                 // 下载并保存数据
@@ -279,7 +288,7 @@ namespace BangumiData
                 }
                 Init(root);
                 await SaveData().ConfigureAwait(false);
-                _vInfo.Version = LatestVersion;
+                _vInfo.Version = newVersion;
                 _vInfo.LastUpdate = DateTimeOffset.UtcNow;
                 // 未设置站点时，设置默认值
                 if (_vInfo.SitesEnabledOrder == null)
@@ -302,7 +311,7 @@ namespace BangumiData
                     _vInfo.SitesEnabledOrder = sitesEnabledOrder.ToArray();
                 }
                 await SaveConfig().ConfigureAwait(false);
-                DownloadCompleted?.Invoke(this, new EventArgs());
+                RaiseVersionUpdatedEvent();
                 return true;
             }
             catch (Exception ex)
@@ -310,6 +319,43 @@ namespace BangumiData
                 Debug.WriteLine(ex);
                 return false;
             }
+        }
+
+        private async Task CheckUpdate()
+        {
+            // 自动检查更新
+            if (AutoCheck && DateTimeOffset.UtcNow.Date >= LastUpdate?.Date.AddDays(CheckInterval))
+            {
+                if (AutoUpdate)
+                {
+                    await DownloadLatestVersion();
+                }
+                else
+                {
+                    var latestVersion = await TryGetLatestVersion().ConfigureAwait(false);
+                    // 获取最新版本失败
+                    if (latestVersion.IsSuccess && Version != latestVersion.Version)
+                    {
+                        RaiseNewVersionFoundedEvent();
+                    }
+                }
+            }
+        }
+
+        private void RaiseNewVersionFoundedEvent()
+        {
+            var e = NewVersionFounded;
+            e?.Invoke(this, new EventArgs());
+        }
+        private void RaiseDownloadStartedEvent()
+        {
+            var e = DownloadStarted;
+            e?.Invoke(this, new EventArgs());
+        }
+        private void RaiseVersionUpdatedEvent()
+        {
+            var e = VersionUpdated;
+            e?.Invoke(this, new EventArgs());
         }
         #endregion
 

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using BangumiData;
 using BangumiData.Models;
@@ -106,7 +107,6 @@ namespace ApiTest
         {
             _api = new BangumiDataApi(@".\TestData");
             ReadData();
-            Assert.IsNull(_api.HasUpdate());
             _api.GetEnabledSites();
             _api.GetDisabledSites();
             foreach (var item in _rootObject.Items)
@@ -114,7 +114,6 @@ namespace ApiTest
                 var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
                 if (x != null)
                 {
-                    //_api.GetAirTimeByBangumiId(x.Id);
                     await _api.GetAirSitesByBangumiId(x.Id);
                 }
             }
@@ -124,7 +123,6 @@ namespace ApiTest
                 var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
                 if (x != null)
                 {
-                    //_api.GetAirTimeByBangumiId(x.Id);
                     await _api.GetAirSitesByBangumiId(x.Id);
                 }
             }
@@ -142,11 +140,57 @@ namespace ApiTest
         public async Task TestBangumiDataApiUpdate()
         {
             _api = new BangumiDataApi(@".\TestData");
-            Assert.IsTrue(string.IsNullOrEmpty(_api.LatestVersion));
-            Assert.IsNull(_api.HasUpdate());
-            Assert.IsFalse(string.IsNullOrEmpty(await _api.GetLatestVersion()));
-            Assert.AreEqual(_api.LatestVersion != _api.Version, _api.HasUpdate());
-            await _api.DownloadLatestBangumiData();
+            var ret = await _api.TryGetLatestVersion();
+            Assert.IsTrue(ret.IsSuccess);
+            Assert.IsFalse(string.IsNullOrEmpty(ret.Version));
+            if (ret.Version != _api.Version)
+            {
+                Assert.AreEqual(true, await _api.DownloadLatestVersion(ret.Version));
+            }
+        }
+
+        [TestMethod]
+        public async Task TestBangumiDataApiAutoCheck()
+        {
+            _api = new BangumiDataApi(@".\TestData");
+            var ret = await _api.TryGetLatestVersion();
+            _api.AutoCheck = true;
+            Assert.IsTrue(ret.IsSuccess);
+            AutoResetEvent autoEvent = new AutoResetEvent(false);
+            _api = new BangumiDataApi(@".\TestData",
+                new EventHandler((s, e) =>
+                {
+                    Assert.AreNotEqual(ret.Version, _api.Version);
+                    autoEvent.Set();
+                }));
+            Assert.IsTrue(autoEvent.WaitOne(TimeSpan.FromSeconds(10)));
+        }
+
+        [TestMethod]
+        public async Task TestBangumiDataApiAutoUpdate()
+        {
+            _api = new BangumiDataApi(@".\TestData");
+            var ret = await _api.TryGetLatestVersion();
+            _api.AutoCheck = true;
+            _api.AutoUpdate = true;
+            bool flag = false;
+            AutoResetEvent autoEvent = new AutoResetEvent(false);
+            _api = new BangumiDataApi(@".\TestData",
+                new EventHandler((s, e) =>
+                {
+                    Assert.AreNotEqual(ret.Version, _api.Version);
+                }),
+                new EventHandler((s, e) =>
+                {
+                    flag = true;
+                }),
+                new EventHandler((s, e) =>
+                {
+                    Assert.IsTrue(flag);
+                    autoEvent.Set();
+                })
+            );
+            Assert.IsTrue(autoEvent.WaitOne(TimeSpan.FromSeconds(20)));
         }
     }
 }
