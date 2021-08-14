@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -6,7 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using BangumiData;
-using BangumiData.Models;
+using BangumiData.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ApiTest
@@ -21,7 +22,7 @@ namespace ApiTest
         public void ReadData()
         {
             Debug.WriteLine(GC.GetTotalMemory(true));
-            _rootObject = JsonSerializer.Deserialize<RootObject>(File.ReadAllBytes(@".\TestData\data.json"), RootObject.GetJsonSerializerOptions());
+            _rootObject = JsonSerializer.Deserialize<RootObject>(File.ReadAllBytes(@".\TestData\data.json"), RootObject.SerializerOptions);
             Debug.WriteLine(GC.GetTotalMemory(true));
         }
 
@@ -81,7 +82,7 @@ namespace ApiTest
                 //Assert.IsNotNull(item.Comment);
                 foreach (var site in item.Sites)
                 {
-                    Assert.IsNotNull(site.SiteName);
+                    Assert.IsNotNull(site.Site);
                     //Assert.IsNotNull(site.Id);
                     //Assert.IsNotNull(site.Begin);
                     //Assert.IsNotNull(site.Broadcast);
@@ -89,11 +90,19 @@ namespace ApiTest
                     //Assert.IsNotNull(site.Comment);
                 }
             }
+            Assert.IsTrue(_rootObject.Items.Any(it => it.End != null));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Broadcast != null));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Comment != null));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Sites.Any(it => it.Id != null)));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Sites.Any(it => it.Begin != null)));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Sites.Any(it => it.Broadcast != null)));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Sites.Any(it => it.Url != null)));
+            Assert.IsTrue(_rootObject.Items.Any(it => it.Sites.Any(it => it.Comment != null)));
             #endregion
 
             foreach (var item in _rootObject.Items)
             {
-                var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
+                var x = item.Sites.FirstOrDefault(it => it.Site == "bangumi");
                 if (x != null)
                 {
                     _baseApi.GetItemById(x.Id);
@@ -105,25 +114,25 @@ namespace ApiTest
         [TestMethod]
         public async Task TestBangumiDataApi()
         {
-            _api = new BangumiDataApi(@".\TestData");
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"));
             ReadData();
             _api.GetEnabledSites();
             _api.GetDisabledSites();
             foreach (var item in _rootObject.Items)
             {
-                var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
+                var x = item.Sites.FirstOrDefault(it => it.Site == "bangumi");
                 if (x != null)
                 {
-                    await _api.GetAirSitesByBangumiId(x.Id);
+                    await foreach (var site in _api.GetAirSitesByBangumiIdAsync(x.Id)) { }
                 }
             }
             _api.UseBiliApp = true;
             foreach (var item in _rootObject.Items)
             {
-                var x = item.Sites.FirstOrDefault(it => it.SiteName == "bangumi");
+                var x = item.Sites.FirstOrDefault(it => it.Site == "bangumi");
                 if (x != null)
                 {
-                    await _api.GetAirSitesByBangumiId(x.Id);
+                    await foreach (var site in _api.GetAirSitesByBangumiIdAsync(x.Id)) { }
                 }
             }
         }
@@ -131,7 +140,7 @@ namespace ApiTest
         [TestMethod]
         public async Task TestBiliSeasonIdMapper()
         {
-            var map = new BiliSeasonIdMapper(@".\TestData\map.json");
+            var map = new BiliSeasonIdMapper(new FilePersistence(@".\TestData"));
             var id = await map.GetSeasonIdAsync("28233896");
             Assert.AreEqual("38214", id);
         }
@@ -139,7 +148,7 @@ namespace ApiTest
         [TestMethod]
         public async Task TestBangumiDataApiUpdate()
         {
-            _api = new BangumiDataApi(@".\TestData");
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"));
             var ret = await _api.TryGetLatestVersion();
             Assert.IsTrue(ret.IsSuccess);
             Assert.IsFalse(string.IsNullOrEmpty(ret.Version));
@@ -152,13 +161,13 @@ namespace ApiTest
         [TestMethod]
         public async Task TestBangumiDataApiAutoCheck()
         {
-            _api = new BangumiDataApi(@".\TestData");
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"));
             var ret = await _api.TryGetLatestVersion();
             Assert.IsTrue(ret.IsSuccess);
             _api.AutoCheck = true;
             _api.CheckInterval = 0;
             AutoResetEvent autoEvent = new AutoResetEvent(false);
-            _api = new BangumiDataApi(@".\TestData",
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"),
                 new EventHandler((s, e) =>
                 {
                     Assert.AreNotEqual(ret.Version, _api.Version);
@@ -170,7 +179,7 @@ namespace ApiTest
         [TestMethod]
         public async Task TestBangumiDataApiAutoUpdate()
         {
-            _api = new BangumiDataApi(@".\TestData");
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"));
             var ret = await _api.TryGetLatestVersion();
             Assert.IsTrue(ret.IsSuccess);
             _api.AutoCheck = true;
@@ -178,7 +187,7 @@ namespace ApiTest
             _api.CheckInterval = 0;
             bool flag = false;
             AutoResetEvent autoEvent = new AutoResetEvent(false);
-            _api = new BangumiDataApi(@".\TestData",
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData"),
                 new EventHandler((s, e) =>
                 {
                     Assert.AreNotEqual(ret.Version, _api.Version);
@@ -194,6 +203,39 @@ namespace ApiTest
                 })
             );
             Assert.IsTrue(autoEvent.WaitOne(TimeSpan.FromSeconds(20)));
+        }
+
+        [TestMethod]
+        public async Task TestBangumiDataApiFirstUsage()
+        {
+            _api = new BangumiDataApi(new FilePersistence(@".\TestData2"));
+            Assert.AreEqual(true, await _api.DownloadLatestVersion());
+            _api.UseBiliApp = true;
+            var sites = new List<SiteInfo>();
+            await foreach (var site in _api.GetAirSitesByBangumiIdAsync("297954"))
+            {
+                sites.Add(site);
+            }
+            var biliSite = sites.FirstOrDefault(it => it.Site.StartsWith("ﬂŸ¡®"));
+            Assert.IsNotNull(biliSite);
+            Assert.IsTrue(biliSite.Url == "bilibili://bangumi/season/38214");
+            Directory.Delete(@".\TestData2", true);
+        }
+
+        [TestMethod]
+        public async Task TestBangumiDataApiWithoutIPersistence()
+        {
+            _api = new BangumiDataApi(null);
+            Assert.AreEqual(true, await _api.DownloadLatestVersion());
+            _api.UseBiliApp = true;
+            var sites = new List<SiteInfo>();
+            await foreach (var site in _api.GetAirSitesByBangumiIdAsync("297954"))
+            {
+                sites.Add(site);
+            }
+            var biliSite = sites.FirstOrDefault(it => it.Site.StartsWith("ﬂŸ¡®"));
+            Assert.IsNotNull(biliSite);
+            Assert.IsTrue(biliSite.Url == "bilibili://bangumi/season/38214");
         }
     }
 }

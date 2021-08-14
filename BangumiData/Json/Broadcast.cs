@@ -1,9 +1,11 @@
 ﻿using System;
 
-namespace BangumiData.Models
+namespace BangumiData.Json
 {
     public class Broadcast
     {
+        public const string DateTimeFormat = "yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'";
+
         public Broadcast(DateTimeOffset begin, int interval, IntervalUnit intervalUnit)
         {
             Begin = begin;
@@ -27,7 +29,7 @@ namespace BangumiData.Models
         public static bool TryParse(string? input, out Broadcast? result)
         {
             result = null;
-            if (string.IsNullOrWhiteSpace(input))
+            if (input == null)
             {
                 return false;
             }
@@ -41,16 +43,20 @@ namespace BangumiData.Models
                 return false;
             }
             // 周期数
-            // .NET Standard 2.1
-            //if (!int.TryParse(ins[2][1..^1], out int interval))
+#if NETSTANDARD2_0
             if (!int.TryParse(ins[2].Substring(1, ins[2].Length - 2), out int interval))
+#else
+            if (!int.TryParse(ins[2][1..^1], out int interval))
+#endif
             {
                 return false;
             }
             // 周期单位
-            // .NET Standard 2.1
-            //var intervalUnit = (IntervalUnit)ins[2][^1];
+#if NETSTANDARD2_0
             var intervalUnit = (IntervalUnit)ins[2][ins[2].Length - 1];
+#else
+            var intervalUnit = (IntervalUnit)ins[2][^1];
+#endif
             if (!Enum.IsDefined(typeof(IntervalUnit), intervalUnit))
             {
                 return false;
@@ -93,13 +99,13 @@ namespace BangumiData.Models
 
         public override string? ToString()
         {
-            return $"R/{Begin.ToString(RootObject.DateTimeFormat)}/P{Interval}{(char)Unit}";
+            return $"R/{Begin.ToString(DateTimeFormat)}/P{Interval}{(char)Unit}";
         }
-    }
 
-    public enum IntervalUnit
-    {
-        Day = 'D',
-        Month = 'M'
+        public enum IntervalUnit
+        {
+            Day = 'D',
+            Month = 'M'
+        }
     }
 }

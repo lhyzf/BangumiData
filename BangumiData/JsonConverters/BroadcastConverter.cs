@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using BangumiData.Models;
+using BangumiData.Json;
 
 namespace BangumiData.JsonConverters
 {

@@ -1,29 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using BangumiData.Interfaces;
+using BangumiData.Json;
 using BangumiData.Models;
 
 namespace BangumiData
 {
     public class BangumiDataApi : BangumiDataBaseApi
     {
+        private const string PersistenceKeyData = "data";
+        private const string PersistenceKeyConfig = "config";
         private const string BangumiDataUrl = "https://api.github.com/repos/bangumi-data/bangumi-data/tags";
         private const string BangumiDataCDNUrl = "https://cdn.jsdelivr.net/npm/bangumi-data@0.3/dist/data.json";
+        private readonly IPersistence? _persistence;
 
-        /// <summary>
-        /// 文件夹路径
-        /// </summary>
-        private string _directory;
-        private string _data_json;
-        private string _map_json;
-        private string _config_json;
 
         // 配置文件信息
-        private VersionInfo _vInfo;
+        private VersionInfo _vInfo = new VersionInfo();
         public string Version => _vInfo.Version;
         public DateTimeOffset? LastUpdate => _vInfo.LastUpdate;
 
@@ -32,24 +29,30 @@ namespace BangumiData
         /// Constructor
         /// </summary>
         /// <param name="directory">Require read/write folder path to save bangumi-data cache file.</param>
-        private BangumiDataApi(string directory)
+        private BangumiDataApi(IPersistence? persistence)
         {
-            SetDirectory(directory);
+            _persistence = persistence;
         }
 
-        public BangumiDataApi(string directory,
-            EventHandler newVersionFoundedEventHandler = null,
-            EventHandler downloadStartedEventHandler = null,
-            EventHandler versionUpdatedEventHandler = null) : this(directory)
+        public BangumiDataApi(IPersistence? persistence,
+            EventHandler? newVersionFoundedEventHandler = null,
+            EventHandler? downloadStartedEventHandler = null,
+            EventHandler? versionUpdatedEventHandler = null) : this(persistence)
         {
-            LoadConfig().Wait();
-            LoadData().Wait();
+            _persistence = persistence;
+            LoadConfig();
+            LoadData();
             NewVersionFounded += newVersionFoundedEventHandler;
             DownloadStarted += downloadStartedEventHandler;
             VersionUpdated += versionUpdatedEventHandler;
             _ = CheckUpdate();
         }
 
+        //public static async Task<BangumiDataApi> CreateAsync(IPersistence persistence)
+        //{
+        //    _persistence = persistence;
+
+        //}
 
         /// <summary>
         /// 根据网站放送开始时间推测更新时间
@@ -81,40 +84,38 @@ namespace BangumiData
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public async Task<List<Site>> GetAirSitesByBangumiId(string id)
+        public async IAsyncEnumerable<SiteInfo> GetAirSitesByBangumiIdAsync(string id)
         {
             var siteList = GetOrderedSitesByBangumiId(id);
             foreach (var site in siteList)
             {
-                if (!string.IsNullOrEmpty(site.Id))
+                var siteMeta = GetSiteMeta(site.Site);
+                // 启用设置，将 mediaid 转换为 seasonid
+                if (_mapper != null && site.Id != null && site.Site.StartsWith("bilibili"))
                 {
-                    site.Url = Root.SiteMeta[site.SiteName].UrlTemplate.Replace("{{id}}", site.Id);
-                }
-            }
-            // 启用设置，将 mediaid 转换为 seasonid
-            if (_mapper != null)
-            {
-                var biliSite = siteList.FirstOrDefault(s => s.SiteName.StartsWith("bilibili"));
-                if (biliSite?.Id != null)
-                {
-                    var seasonId = await _mapper.GetSeasonIdAsync(biliSite.Id).ConfigureAwait(false);
+                    var seasonId = await _mapper.GetSeasonIdAsync(site.Id).ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(seasonId))
                     {
-                        biliSite.Url = "bilibili://bangumi/season/" + seasonId;
+                        yield return site with
+                        {
+                            Url = "bilibili://bangumi/season/" + seasonId,
+                            Site = siteMeta.Title
+                        };
+                        continue;
                     }
                 }
+                yield return site with
+                {
+                    Url = siteMeta.UrlTemplate.Replace("{{id}}", site.Id),
+                    Site = siteMeta.Title
+                };
             }
-            foreach (var site in siteList)
-            {
-                site.SiteName = Root.SiteMeta[site.SiteName].Title;
-            }
-            return siteList.ToList();
         }
 
         /// <summary>
         /// 根据Bangumi的ID返回所有放送网站
         /// </summary>
-        private IEnumerable<Site> GetOrderedSitesByBangumiId(string id)
+        private IEnumerable<SiteInfo> GetOrderedSitesByBangumiId(string id)
         {
             var bangumiItem = GetItemById(id);
             if (bangumiItem?.Sites == null || _vInfo.SitesEnabledOrder == null)
@@ -124,22 +125,12 @@ namespace BangumiData
             var sites = bangumiItem.Sites;
             foreach (var item in _vInfo.SitesEnabledOrder)
             {
-                // 未标明的资源站使用番剧标题作为ID
-                if (Root.SiteMeta[item].Type == "resource" && !sites.Any(it => it.SiteName == item))
-                {
-                    yield return new Site
-                    {
-                        SiteName = item,
-                        Id = bangumiItem.TitleTranslate.FirstOrDefault().Value?.FirstOrDefault() ??
-                             bangumiItem.Title
-                    };
-                }
-                var site = sites.FirstOrDefault(it => it.SiteName == item);
+                var site = sites.FirstOrDefault(it => it.Site == item);
                 if (site == null)
                 {
                     continue;
                 }
-                yield return site.Clone();
+                yield return site;
             }
         }
 
@@ -161,7 +152,7 @@ namespace BangumiData
             {
                 if (value)
                 {
-                    _mapper = new BiliSeasonIdMapper(_map_json);
+                    _mapper = new BiliSeasonIdMapper(_persistence);
                 }
                 else
                 {
@@ -186,7 +177,7 @@ namespace BangumiData
                         _vInfo.AutoUpdate = false;
                         _vInfo.CheckInterval = 7;
                     }
-                    SaveConfig().Wait();
+                    SaveConfig();
                 }
             }
         }
@@ -199,7 +190,7 @@ namespace BangumiData
                 if (_vInfo.AutoUpdate != value)
                 {
                     _vInfo.AutoUpdate = value;
-                    SaveConfig().Wait();
+                    SaveConfig();
                 }
             }
         }
@@ -212,25 +203,26 @@ namespace BangumiData
                 if (_vInfo.CheckInterval != value)
                 {
                     _vInfo.CheckInterval = value;
-                    SaveConfig().Wait();
+                    SaveConfig();
                 }
             }
         }
 
-        public event EventHandler NewVersionFounded;
-        public event EventHandler DownloadStarted;
-        public event EventHandler VersionUpdated;
+        public event EventHandler? NewVersionFounded;
+        public event EventHandler? DownloadStarted;
+        public event EventHandler? VersionUpdated;
 
         /// <summary>
         /// 尝试获取最新版本号
         /// </summary>
         /// <returns>返回最新版本号，失败后返回空字符串</returns>
+
         public async Task<(bool IsSuccess, string Version)> TryGetLatestVersion()
         {
             try
             {
                 var result = await HttpHelper.GetJsonDocumentAsync(BangumiDataUrl).ConfigureAwait(false);
-                var version = result.RootElement[0].GetProperty("name").GetString();
+                var version = result?.RootElement[0].GetProperty("name").GetString() ?? string.Empty;
                 if (string.IsNullOrEmpty(version))
                 {
                     return (false, string.Empty);
@@ -264,7 +256,7 @@ namespace BangumiData
                 if (Version == latestVersion.Version)
                 {
                     _vInfo.LastUpdate = DateTimeOffset.UtcNow;
-                    await SaveConfig().ConfigureAwait(false);
+                    SaveConfig();
                     return true;
                 }
                 newVersion = latestVersion.Version;
@@ -281,13 +273,9 @@ namespace BangumiData
             {
                 // 下载并保存数据
                 var data = await HttpHelper.GetStringAsync(BangumiDataCDNUrl).ConfigureAwait(false);
-                var root = JsonSerializer.Deserialize<RootObject>(data, RootObject.GetJsonSerializerOptions());
-                if (root == null)
-                {
-                    throw new ArgumentNullException(nameof(root));
-                }
-                Init(root);
-                await SaveData().ConfigureAwait(false);
+                var root = JsonSerializer.Deserialize<RootObject>(data, RootObject.SerializerOptions);
+                Init(root ?? throw new ArgumentNullException(nameof(root)));
+                SaveData();
                 _vInfo.Version = newVersion;
                 _vInfo.LastUpdate = DateTimeOffset.UtcNow;
                 // 未设置站点时，设置默认值
@@ -310,7 +298,7 @@ namespace BangumiData
                 {
                     _vInfo.SitesEnabledOrder = sitesEnabledOrder.ToArray();
                 }
-                await SaveConfig().ConfigureAwait(false);
+                SaveConfig();
                 RaiseVersionUpdatedEvent();
                 return true;
             }
@@ -367,7 +355,7 @@ namespace BangumiData
         public IDictionary<string, SiteMeta> GetDisabledSites()
         {
             var sites = new Dictionary<string, SiteMeta>();
-            if (Root.SiteMeta != null && _vInfo.SitesEnabledOrder != null)
+            if (Root?.SiteMeta != null && _vInfo.SitesEnabledOrder != null)
             {
                 foreach (var item in Root.SiteMeta)
                 {
@@ -387,7 +375,7 @@ namespace BangumiData
         public IDictionary<string, SiteMeta> GetEnabledSites()
         {
             var sites = new Dictionary<string, SiteMeta>();
-            if (Root.SiteMeta != null && _vInfo.SitesEnabledOrder != null)
+            if (Root?.SiteMeta != null && _vInfo.SitesEnabledOrder != null)
             {
                 foreach (var site in _vInfo.SitesEnabledOrder)
                 {
@@ -404,58 +392,39 @@ namespace BangumiData
         /// 设置启用的站点以及顺序
         /// </summary>
         /// <param name="siteKeys"></param>
-        public async Task SetSitesEnabledOrder(string[] siteKeys)
+        public void SetSitesEnabledOrder(params string[] siteKeys)
         {
             _vInfo.SitesEnabledOrder = siteKeys;
-            await SaveConfig().ConfigureAwait(false);
+            SaveConfig();
         }
         #endregion
 
-        #region File
-        private void SetDirectory(string directory)
+        #region Persistence
+        private void LoadData()
         {
-            if (string.IsNullOrEmpty(directory))
+            var root = _persistence?.Read<RootObject>(PersistenceKeyData);
+            if (root == null) { return; }
+            // 未设置站点时，设置默认值
+            if (_vInfo.SitesEnabledOrder == null)
             {
-                throw new ArgumentNullException(nameof(directory));
+                SetSitesEnabledOrder(root.SiteMeta.Where(it => it.Value.Type == "onair").Select(it => it.Key).ToArray());
             }
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            _directory = directory;
-            _data_json = Path.Combine(_directory, "data.json");
-            _map_json = Path.Combine(_directory, "map.json");
-            _config_json = Path.Combine(_directory, "config.json");
+            Init(root);
         }
 
-        private async Task LoadData()
+        private void SaveData()
         {
-            RootObject? root = null;
-            if (File.Exists(_data_json))
-            {
-                root = await FileHelper.ReadAsync<RootObject>(_data_json, RootObject.GetJsonSerializerOptions()).ConfigureAwait(false) ?? new RootObject();
-                // 未设置站点时，设置默认值
-                if (_vInfo.SitesEnabledOrder == null)
-                {
-                    await SetSitesEnabledOrder(root.SiteMeta.Where(it => it.Value.Type == "onair").Select(it => it.Key).ToArray()).ConfigureAwait(false);
-                }
-            }
-            Init(root ?? new RootObject());
+            _persistence?.Save(PersistenceKeyData, Root);
         }
 
-        private async Task SaveData()
+        private void LoadConfig()
         {
-            await FileHelper.WriteAsync(_data_json, Root, RootObject.GetJsonSerializerOptions()).ConfigureAwait(false);
+            _vInfo = _persistence?.Read<VersionInfo>(PersistenceKeyConfig) ?? new VersionInfo();
         }
 
-        private async Task LoadConfig()
+        private void SaveConfig()
         {
-            _vInfo = await FileHelper.ReadAsync<VersionInfo>(_config_json).ConfigureAwait(false) ?? new VersionInfo();
-        }
-
-        private async Task SaveConfig()
-        {
-            await FileHelper.WriteAsync(_config_json, _vInfo).ConfigureAwait(false);
+            _persistence?.Save(PersistenceKeyConfig, _vInfo);
         }
         #endregion
     }

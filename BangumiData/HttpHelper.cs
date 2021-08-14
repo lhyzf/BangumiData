@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -9,8 +10,9 @@ namespace BangumiData
 {
     public static class HttpHelper
     {
-        private static HttpClient _client = null;
+        private static HttpClient? _client = null;
 
+        [MemberNotNull(nameof(_client))]
         private static void EnsureClient()
         {
             if (_client == null)

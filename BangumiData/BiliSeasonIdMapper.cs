@@ -1,24 +1,27 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using BangumiData.Interfaces;
 
 namespace BangumiData
 {
     /// <summary>
     /// 将 mediaId 映射为 seasonId 的缓存
     /// </summary>
-    public class BiliSeasonIdMapper
+    public class BiliSeasonIdMapper : ConcurrentDictionary<string, string>
     {
-        private readonly string _filename;
-        private Dictionary<string, string> _map;
+        private const string PersistenceKey = "map";
+        private const string ErrorPrefix = "[Error]";
+        private readonly IPersistence? _persistence;
 
-        public BiliSeasonIdMapper(string filename)
+        public BiliSeasonIdMapper(IPersistence? persistence)
+            : base(persistence?.Read<ConcurrentDictionary<string, string>>(PersistenceKey) ?? new ConcurrentDictionary<string, string>())
         {
-            _filename = filename;
-            LoadFromFile().Wait();
+            _persistence = persistence;
         }
 
         /// <summary>
@@ -28,9 +31,9 @@ namespace BangumiData
         /// <returns>string.Empty 表示非法数据；当前正在请求或请求失败或接口失效等</returns>
         public async Task<string> GetSeasonIdAsync(string mediaId)
         {
-            if (!_map.TryGetValue(mediaId, out string? seasonId))
+            if (!TryGetValue(mediaId, out string? seasonId))
             {
-                _map[mediaId] = string.Empty;
+                this[mediaId] = string.Empty;
                 var url = $"https://bangumi.bilibili.com/view/web_api/media?media_id={mediaId}";
                 try
                 {
@@ -43,14 +46,14 @@ namespace BangumiData
                             .GetProperty("param")
                             .GetProperty("season_id")
                             .ToString();
-                        _map[mediaId] = seasonId ?? throw new ArgumentNullException(nameof(seasonId));
+                        this[mediaId] = seasonId ?? throw new ArgumentNullException(nameof(seasonId));
                     }
                     else
                     {
-                        seasonId = $"[Error]{statusCode}";
-                        _map[mediaId] = seasonId;
+                        seasonId = $"{ErrorPrefix}{statusCode}";
+                        this[mediaId] = seasonId;
                     }
-                    await SaveToFile().ConfigureAwait(false);
+                    _persistence?.Save(PersistenceKey, this);
                 }
                 catch (HttpRequestException e)
                 {
@@ -68,39 +71,25 @@ namespace BangumiData
                 {
                     if (string.IsNullOrEmpty(seasonId))
                     {
-                        _map.Remove(mediaId);
-                        await SaveToFile().ConfigureAwait(false);
+                        TryRemove(mediaId, out _);
                     }
                 }
-                return (seasonId?.StartsWith("[Error]") ?? true) ? string.Empty : seasonId;
+                return (seasonId?.StartsWith(ErrorPrefix) ?? true) ? string.Empty : seasonId;
             }
-            else
+            else if (seasonId.StartsWith(ErrorPrefix))
             {
-                if (seasonId.StartsWith("[Error]"))
+                var code = seasonId.Substring(ErrorPrefix.Length);
+                if (code == "-404")
                 {
-                    var code = seasonId.Substring("[Error]".Length);
-                    if (code == "-404")
-                    {
-                        return string.Empty;
-                    }
-                    else
-                    {
-                        _map.Remove(mediaId);
-                        return await GetSeasonIdAsync(mediaId);
-                    }
+                    return string.Empty;
+                }
+                else
+                {
+                    TryRemove(mediaId, out _);
+                    return await GetSeasonIdAsync(mediaId);
                 }
             }
             return seasonId;
-        }
-
-        private async Task LoadFromFile()
-        {
-            _map = await FileHelper.ReadAsync<Dictionary<string, string>>(_filename).ConfigureAwait(false) ?? new Dictionary<string, string>();
-        }
-
-        public async Task SaveToFile()
-        {
-            await FileHelper.WriteAsync(_filename, _map).ConfigureAwait(false);
         }
     }
 }
