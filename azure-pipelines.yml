@@ -50,13 +50,13 @@ jobs:
       displayName: 'Test'
       inputs:
         command: 'test'
-        projects: '**/*Test.csproj'
+        projects: 'Source/**/*Test.csproj'
 
     - task: DotNetCoreCLI@2
       displayName: 'Pack'
       inputs:
         command: 'pack'
-        packagesToPack: 'BangumiData/BangumiData.csproj'
+        packagesToPack: 'Source/BangumiData/BangumiData.csproj'
         includesymbols: true
         versioningScheme: 'byEnvVar'
         versionEnvVar: 'tagVersion'
