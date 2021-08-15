@@ -30,6 +30,7 @@ jobs:
       displayName: 'Install .NET SDK'
       inputs:
         packageType: 'sdk'
+        version: '5.x'
 
     - task: DotNetCoreCLI@2
       displayName: 'Restore'
@@ -46,6 +47,11 @@ jobs:
         arguments: '--configuration $(buildConfiguration) -warnAsError /p:Version=$(tagVersion)'
 
     - task: DotNetCoreCLI@2
+      inputs:
+        command: 'test'
+        projects: '**/*Test.csproj'
+
+    - task: DotNetCoreCLI@2
       displayName: 'Pack'
       inputs:
         command: 'pack'
@@ -59,6 +65,7 @@ jobs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
         ArtifactName: 'Packages'
         publishLocation: 'Container'
+
     - task: NuGetCommand@2
       displayName: Push Nuget Package
       condition: and(succeeded(), eq(variables.IsTag, true))

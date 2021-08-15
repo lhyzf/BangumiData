@@ -316,7 +316,7 @@ namespace BangumiData
             {
                 if (AutoUpdate)
                 {
-                    await DownloadLatestVersion();
+                    await DownloadLatestVersion().ConfigureAwait(false);
                 }
                 else
                 {
