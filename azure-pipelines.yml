@@ -58,7 +58,6 @@ jobs:
         command: 'pack'
         packagesToPack: 'BangumiData/BangumiData.csproj'
         includesymbols: true
-        symbolPackageFormat: 'snupkg'
         versioningScheme: 'byEnvVar'
         versionEnvVar: 'tagVersion'
 
