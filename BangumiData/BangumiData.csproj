@@ -10,7 +10,7 @@
     <Authors>猫苇</Authors>
     <Version>0.1.0-beta</Version>
     <Copyright>Copyright (c) 2021 猫苇</Copyright>
-    <Description>A bangumi-data wrapper.</Description>
+    <Description>A bangumi-data C# wrapper.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/lhyzf/BangumiData.git</RepositoryUrl>
@@ -18,7 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' != '.NETCoreApp'">
