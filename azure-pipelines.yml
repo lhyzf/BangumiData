@@ -47,6 +47,7 @@ jobs:
         arguments: '--configuration $(buildConfiguration) -warnAsError /p:Version=$(tagVersion)'
 
     - task: DotNetCoreCLI@2
+      displayName: 'Test'
       inputs:
         command: 'test'
         projects: '**/*Test.csproj'
