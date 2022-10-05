@@ -30,7 +30,7 @@ jobs:
       displayName: 'Install .NET SDK'
       inputs:
         packageType: 'sdk'
-        version: '6.x'
+        useGlobalJson: true
 
     - task: DotNetCoreCLI@2
       displayName: 'Restore'
