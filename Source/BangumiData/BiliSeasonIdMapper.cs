@@ -34,7 +34,7 @@ namespace BangumiData
             if (!TryGetValue(mediaId, out string? seasonId))
             {
                 this[mediaId] = string.Empty;
-                var url = $"https://bangumi.bilibili.com/view/web_api/media?media_id={mediaId}";
+                var url = $"https://api.bilibili.com/pgc/review/user?media_id={mediaId}";
                 try
                 {
                     var result = await HttpHelper.GetJsonDocumentAsync(url).ConfigureAwait(false);
@@ -43,7 +43,7 @@ namespace BangumiData
                     {
                         seasonId = result?.RootElement
                             .GetProperty("result")
-                            .GetProperty("param")
+                            .GetProperty("media")
                             .GetProperty("season_id")
                             .ToString();
                         this[mediaId] = seasonId ?? throw new ArgumentNullException(nameof(seasonId));
