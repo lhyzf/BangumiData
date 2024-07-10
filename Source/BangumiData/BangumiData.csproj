@@ -9,13 +9,18 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>猫苇</Authors>
     <Version>0.1.0-beta</Version>
-    <Copyright>Copyright (c) 2021-2022 猫苇</Copyright>
+    <Copyright>Copyright (c) 2021-2024 猫苇</Copyright>
     <Description>A bangumi-data C# wrapper.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/lhyzf/BangumiData.git</RepositoryUrl>
     <PackageProjectUrl>https://github.com/lhyzf/BangumiData</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 
   <PropertyGroup Label="SourceLink">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
